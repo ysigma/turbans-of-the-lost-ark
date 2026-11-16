@@ -1,0 +1,28 @@
+{
+  "bikraam_focus": [
+    "audio/bikraam_focus.mp4"
+  ],
+  "bikraam_spot": [
+    "audio/bikraam_spot.mp4"
+  ],
+  "bikraam_taunt": [
+    "audio/bikraam_taunt-1.mp4",
+    "audio/bikraam_taunt-2.mp4",
+    "audio/bikraam_taunt-3.mp4"
+  ],
+  "intro_babbu": [
+    "audio/intro-babbu.mp4"
+  ],
+  "intro_bibi": [
+    "audio/intro-bibi.mp4"
+  ],
+  "intro_jasmeet": [
+    "audio/intro-jasmeet.mp4"
+  ],
+  "papaji_focus": [
+    "audio/papaji_focus.mp4"
+  ],
+  "papaji_line": [
+    "audio/papaji_line.mp4"
+  ]
+}
