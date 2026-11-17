@@ -14519,6 +14519,7 @@ const ICON = {
   mic: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.8" y="2.8" width="6.4" height="11.4" rx="3.2" fill="currentColor"/><path d="M5.6 11a6.4 6.4 0 0 0 12.8 0M12 17.6V21M8.4 21h7.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   map: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.2l6-2.2 6 2.2 6-2.2v13.8l-6 2.2-6-2.2-6 2.2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 4v13.8M15 6.2V20" stroke="currentColor" stroke-width="2"/></svg>',
   help: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.6 8.8a3.5 3.5 0 1 1 5 3.2c-1 .5-1.6 1.2-1.6 2.3v.6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="19" r="1.6" fill="currentColor"/></svg>',
+  menu: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 7h15M4.5 12h15M4.5 17h15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>',
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>',
   magnet: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 3.5v8.5a6.5 6.5 0 0 0 13 0V3.5h-4.2V12a2.3 2.3 0 0 1-4.6 0V3.5z" fill="currentColor"/><path d="M5.5 3.5h4.2v3.2H5.5zM14.3 3.5h4.2v3.2h-4.2z" fill="#2a1512"/></svg>',
   dhol: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8.5v7c0 2.2 3.8 3.9 8.5 3.9s8.5-1.7 8.5-3.9v-7" fill="currentColor" opacity=".9"/><ellipse cx="12" cy="8.5" rx="8.5" ry="3.6" fill="#fff" stroke="#2a1512" stroke-width="1.2"/><path d="M6.5 11.5l3.2 7M17.5 11.5l-3.2 7" stroke="#2a1512" stroke-width="1.3"/></svg>',
@@ -14659,7 +14660,9 @@ const CSS = `
 
 .th-tr { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px));
   display: flex; align-items: flex-start; gap: 8px; }
-.th-btns { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.th-btns { position: relative; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.th-menupop { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.th-menubtn { display: none; }
 .th-time { font: 800 14px/1 var(--font-ui); padding: 6px 10px 5px; border-radius: 999px; background: var(--panel); color: var(--ink);
   font-variant-numeric: tabular-nums; box-shadow: inset 0 0 0 1px rgba(246, 195, 67, 0.3); }
 .th-ibtn { pointer-events: auto; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 12px; cursor: pointer; display: grid; place-items: center;
@@ -14958,6 +14961,23 @@ const CSS = `
   .th-h1 { font-size: 30px; }
 }
 .th-is-touch .th-ability { display: none; }
+/* phones: one menu button instead of a column of five, a slimmer compass, smaller big moments */
+.th-is-touch .th-menubtn { display: grid; }
+.th-is-touch .th-menupop { display: none; position: absolute; top: calc(100% + 8px); right: 0; z-index: 7; padding: 8px;
+  border-radius: 14px; background: var(--phulkari), var(--panel); box-shadow: inset 0 0 0 1.5px rgba(246, 195, 67, 0.35), 0 10px 26px rgba(0, 0, 0, 0.45); }
+.th-is-touch .th-btns.open .th-menupop { display: flex; animation: th-menu-in 0.16s ease-out; }
+@keyframes th-menu-in { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
+.th-is-touch .th-menupop .th-time { align-self: stretch; text-align: center; }
+.th-is-touch .th-ctext { display: none; }
+.th-is-touch .th-compass { padding: 5px; align-self: flex-end; width: auto; }
+.th-is-touch .th-tts { font-size: 12px; max-width: 78vw; }
+.th-is-touch .th-hud { --dial: 40px; }
+.th-is-touch .th-banner { top: 29%; }
+.th-is-touch .th-btext { font-size: clamp(26px, 7.5vw, 44px); -webkit-text-stroke-width: 6px; text-shadow: 0 4px 0 #b4570a, 0 8px 18px rgba(0, 0, 0, 0.4); }
+.th-is-touch .th-banner.lvl-5 .th-btext, .th-is-touch .th-banner.lvl-6 .th-btext { font-size: clamp(28px, 8vw, 48px); }
+.th-is-touch .th-bsub { font-size: 11px; padding: 5px 11px 4px; margin-top: 5px; box-shadow: 0 0 0 2px var(--gold), 0 4px 10px rgba(0, 0, 0, 0.3); }
+.th-is-touch .th-spark { display: none; }
+.th-is-touch .th-combo { min-width: 110px; }
 .th-is-touch .th-bc { bottom: calc(206px + env(safe-area-inset-bottom, 0px)); }
 .th-is-touch .th-ibtn { width: 42px; height: 42px; }
 
@@ -15149,7 +15169,23 @@ function init(ctx) {
   });
   const boothBtn = button('th-ibtn', 'Voice Booth (V)', ICON.mic, () => ctx.openBooth?.());
   const mapBtn = button('th-ibtn', 'Big map (M)', ICON.map, () => setBigMap(!bigOpen));
-  btns.append(timeEl, pauseBtn, muteBtn, musicBtn, boothBtn, mapBtn);
+  // On phones the options live behind one menu button; on desktop the pop-out is just the column.
+  const menuPop = h('div', 'th-menupop');
+  menuPop.id = 'th-menupop';
+  menuPop.append(timeEl, pauseBtn, muteBtn, musicBtn, boothBtn, mapBtn);
+  const menuBtn = button('th-ibtn th-menubtn', 'Options', ICON.menu, () => setMenu(!btns.classList.contains('open')));
+  menuBtn.setAttribute('aria-controls', 'th-menupop');
+  menuBtn.setAttribute('aria-expanded', 'false');
+  btns.append(menuBtn, menuPop);
+  function setMenu(open) {
+    btns.classList.toggle('open', !!open);
+    menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    menuBtn.innerHTML = open ? ICON.close : ICON.menu;
+  }
+  // picking an option (or tapping anywhere else) folds the menu away again
+  for (const b of [pauseBtn, boothBtn, mapBtn]) b.addEventListener('click', () => setMenu(false));
+  doc.addEventListener('pointerdown', (e) => { if (btns.classList.contains('open') && !btns.contains(e.target)) setMenu(false); }, true);
+  ctx.events.on('mode', () => setMenu(false));
 
   const mapCol = h('div', 'th-mapcol');
   const miniWrap = h('div', 'th-mini');
@@ -15734,6 +15770,7 @@ function init(ctx) {
     floats.push({ el, active: false, x: 0, y: 0, z: 0, t0: 0, dur: 1.1, rise: 1.2, jx: 0, born: 0 });
   }
   let floatSerial = 0;
+  let floatSide = 1;      // phones: alternate pop-ups left and right of the hero
 
   function float(text, worldPos, opts) {
     if (text === undefined || text === null || !worldPos) return;
@@ -15757,7 +15794,8 @@ function init(ctx) {
     const el = f.el;
     el.textContent = String(text);
     el.style.color = typeof o.color === 'string' ? o.color : '#fff6e6';
-    el.style.fontSize = `${(22 * size).toFixed(1)}px`;
+    el.style.fontSize = `${((isTouch ? 13 : 22) * size).toFixed(1)}px`;
+    f.side = isTouch ? (floatSide = -floatSide) : 0;
     el.style.opacity = '0';
   }
 
@@ -15772,8 +15810,14 @@ function init(ctx) {
       const ease = 1 - (1 - k) * (1 - k);
       _v.set(f.x, f.y + f.rise * (reduced ? ease * 0.5 : ease), f.z).project(cam);
       if (_v.z > 1 || _v.z < -1) { el.style.opacity = '0'; continue; }
-      const sx = (_v.x * 0.5 + 0.5) * vw + f.jx;
-      const sy = (-_v.y * 0.5 + 0.5) * vh;
+      let sx = (_v.x * 0.5 + 0.5) * vw + f.jx;
+      let sy = (-_v.y * 0.5 + 0.5) * vh;
+      if (f.side) {
+        // phones: drift up and out to the side so the hero stays visible
+        sx += f.side * (vw * 0.2 + ease * vw * 0.05);
+        sy -= vh * 0.13 + ease * vh * 0.04;
+        sx = clamp(sx, 50, vw - 50);
+      }
       let pop = 1;
       if (!reduced) pop = k < 0.12 ? 0.5 + (k / 0.12) * 0.72 : k < 0.24 ? 1.22 - ((k - 0.12) / 0.12) * 0.22 : 1;
       const op = k < 0.08 ? k / 0.08 : k > 0.62 ? 1 - (k - 0.62) / 0.38 : 1;
@@ -16451,7 +16495,7 @@ function init(ctx) {
       try { st = ctx.audio?.clipStatus?.(); } catch (e) { st = null; }
       if (st?.waheguru?.source === 'tts' && !ttsDismissed && state.mode === 'playing') {
         ttsChip.hidden = false;
-        ttsUntil = uiTime + 16;
+        ttsUntil = uiTime + (isTouch ? 6 : 16);   // phones: a brief note, then out of the way
         if (!reduced) anim(ttsChip, KF_IN, { duration: 300, easing: 'ease-out' });
       }
     }
