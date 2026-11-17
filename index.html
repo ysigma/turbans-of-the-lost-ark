@@ -392,6 +392,15 @@ function init(ctx) {
     },
   };
 
+  // Within 20 m of the Diamond Rumal, both of them drop in for one last stand (hazards.js).
+  const showdown = {
+    eyebrow: 'Final showdown',
+    name: 'Bikraam & Papaji',
+    tagline: 'Standing between you and the Diamond Rumal. Bikraam has prepared a speech.',
+    count: 'The Lost Ark',
+    go: ['SHOWDOWN! Get past them to the Diamond Rumal!', 'Speech over. Chappals AND homework incoming. RUN for the Rumal!'],
+  };
+
   const controls = [
     ['W A S D / arrows', 'Walk'],
     ['Mouse (click to lock) / drag', 'Look around'],
@@ -432,6 +441,7 @@ function init(ctx) {
     sky,
     controls,
     bosses,
+    showdown,
   };
 }
 
@@ -6882,6 +6892,8 @@ function init(ctx) {
     arkPosition,
     compass,
     isRevealed: () => compass.stage >= 3 || rumalTaken,
+    // Ark-local (x to the prow, +z out through the breach) to world XZ. hazards stages the showdown with it.
+    toWorld: (lx, lz) => ({ x: toWorldX(lx, lz), z: toWorldZ(lx, lz) }),
     reset,
     start,
     update,
@@ -12051,7 +12063,7 @@ function init(ctx) {
       id, type: id, def: BOSS_DEF[id], state: 'off', timer: 0, chaseT: 0, throwT: 0, windT: 0, phase: 0,
       pos: new THREE.Vector3(), aim: new THREE.Vector3(), headPos: new THREE.Vector3(),
       post: { x: 0, z: 0, ok: false }, yaw: 0, speed: 0, hitCool: 0, tauntAt: 0, lastTake: -1,
-      spottedOnce: false, rig: null, lookYaw: 0, jump: 0,
+      spottedOnce: false, rig: null, lookYaw: 0, jump: 0, extra: 0,
     };
     b.rig = id === 'bikraam' ? buildBikraam() : buildPapaji();
     b.headGet = () => b.headPos;
@@ -12109,13 +12121,16 @@ function init(ctx) {
   function clearStars(b) {
     if (b.rig.stars) { b.rig.head.remove(b.rig.stars); releaseStars(b.rig.stars); b.rig.stars = null; }
   }
-  function startChase(b) {
+  function startChase(b, quiet) {
     b.state = 'spot';
     b.timer = 0.9;
     b.jump = 0;
-    const lines = ctx.content?.bosses?.[b.id]?.spotted;
-    toast(pickLine(lines), 'warn');
-    bossSay(b, b.def.spotClip, true);   // the "first sees you" clip always gets the floor
+    b.extra = 0;
+    if (!quiet) {
+      const lines = ctx.content?.bosses?.[b.id]?.spotted;
+      toast(pickLine(lines), 'warn');
+      bossSay(b, b.def.spotClip, true);   // the "first sees you" clip always gets the floor
+    }
     emitHazard('hazard:spawn', b);
   }
   function bossGiveUp(b, line) {
@@ -12186,7 +12201,7 @@ function init(ctx) {
         b.timer -= dt;
         b.jump = Math.sin(Math.min(1, (0.9 - b.timer) / 0.5) * Math.PI) * 0.35;
         if (!live) { b.state = 'post'; break; }
-        if (b.timer <= 0) { b.state = 'chase'; b.chaseT = 0; b.throwT = U.lerp(def.throwGap[0], def.throwGap[1], Math.random()) * 0.6; b.tauntAt = 0; b.jump = 0; }
+        if (b.timer <= 0) { b.state = 'chase'; b.chaseT = 0; b.throwT = Math.max(b.hitCool, U.lerp(def.throwGap[0], def.throwGap[1], Math.random()) * 0.6); b.tauntAt = 0; b.jump = 0; }
         break;
       }
       case 'chase': {
@@ -12219,7 +12234,7 @@ function init(ctx) {
           if (!b.tauntAt) b.tauntAt = t + U.lerp(def.tauntGap[0], def.tauntGap[1], Math.random());
           else if (t >= b.tauntAt) { if (bossSay(b, def.tauntClip, false)) b.tauntAt = 0; else b.tauntAt = t + 1; }
         }
-        if (b.chaseT > def.chaseTime || d > def.lose) bossGiveUp(b, pickLine(ctx.content?.bosses?.[b.id]?.giveUp));
+        if (b.chaseT > def.chaseTime + b.extra || d > def.lose) bossGiveUp(b, pickLine(ctx.content?.bosses?.[b.id]?.giveUp));
         break;
       }
       case 'gloat': {
@@ -12334,7 +12349,7 @@ function init(ctx) {
       r.armR.rotation.set(-2.5 * Math.sin(k * Math.PI * 0.5), 0, 0.2);
     }
     r.head.rotation.set(headPitch, headYaw, 0);
-    r.tag.visible = st !== 'tired' && st !== 'leave';
+    r.tag.visible = st !== 'tired' && st !== 'leave' && b.jump < 0.6;
     b.aim.set(b.pos.x, b.pos.y + 1.2, b.pos.z);
     b.headPos.set(b.pos.x, b.pos.y + def.tagY + 0.25, b.pos.z);
   }
@@ -12350,7 +12365,7 @@ function init(ctx) {
   }
 
   // ---- the intro: orbit Bikraam to his focus music, then swing over to Papaji for his
-  const cut = { active: false, seg: 0, t: 0, segT: 0, len: 0, clip: null, fly: 0, angle: 0, from: new THREE.Vector3(), look: new THREE.Vector3(), fromLook: new THREE.Vector3() };
+  const cut = { kind: 'intro', shake: 0, active: false, seg: 0, t: 0, segT: 0, len: 0, clip: null, fly: 0, angle: 0, from: new THREE.Vector3(), look: new THREE.Vector3(), fromLook: new THREE.Vector3() };
   const _camGoal = new THREE.Vector3();
   const _lookGoal = new THREE.Vector3();
   function cutBoss() { return bosses[BOSS_IDS[cut.seg]]; }
@@ -12358,10 +12373,11 @@ function init(ctx) {
     if (!BOSS_IDS.every((id) => bosses[id].post.ok)) return false;
     for (const id of BOSS_IDS) { toPost(bosses[id]); bosses[id].state = 'pose'; }
     clearProjs();
+    cut.kind = 'intro';
     cut.active = true;
     cut.t = 0;
     startSeg(0);
-    ctx.events.emit('cutscene:start', { bosses: BOSS_IDS.slice() });
+    ctx.events.emit('cutscene:start', { bosses: BOSS_IDS.slice(), kind: 'intro' });
     return true;
   }
   function startSeg(i) {
@@ -12423,6 +12439,152 @@ function init(ctx) {
       else endIntro();
     }
   }
+
+  // ---- the showdown: come within 20 m of the Diamond Rumal and both of them drop out of the
+  // sky in front of the Ark's breach. The camera swings round to face them, Bikraam gives his
+  // speech (audio/bikraam_showdown, cut from his own voice notes), then both come for you.
+  const SHOWDOWN_R = 20;
+  const SHOWDOWN_SPOT = { bikraam: [-1.9, 9.2], papaji: [1.9, 9.6] };   // Ark-local, outside the breach
+  const SHOWDOWN_DROP = { bikraam: 0.7, papaji: 1.2 };                  // when each one falls (s)
+  const DROP_H = 9, DROP_G = 30;
+  const SHOWDOWN_EXTRA = 25;                                            // they chase this much longer
+  const SHOWDOWN_GRACE = 3;                                             // seconds before their first hit lands
+  let showdownDone = false;
+  const sd = { mid: new THREE.Vector3(), out: 0, landed: { bikraam: false, papaji: false } };
+  const _fwd = new THREE.Vector3();
+
+  function maybeShowdown() {
+    if (showdownDone || cut.active || !P.ok || ctx.state.rumalFound) return;
+    const a = ctx.quest?.arkPosition;
+    if (!a || typeof ctx.quest.toWorld !== 'function') return;
+    if (U.dist2(P.x, P.z, a.x, a.z) > SHOWDOWN_R * SHOWDOWN_R) return;
+    showdownDone = true;
+    // a fair gauntlet: if they catch you broke, you wake up right here, not back at the last dhaba
+    try { ctx.player?.setCheckpoint?.(P.x, P.z); } catch (e) { /* optional */ }
+    beginShowdown();
+  }
+  function beginShowdown() {
+    const q = ctx.quest;
+    const ctr = q.toWorld(0, 0), outP = q.toWorld(0, 30);
+    if (bossLine && bossLine.playing) bossLine.stop(0.3);
+    bossLine = null;
+    clearProjs();
+    sd.out = yawTo(outP.x - ctr.x, outP.z - ctr.z);        // facing out of the breach
+    sd.mid.set(0, 0, 0);
+    for (const id of BOSS_IDS) {
+      const b = bosses[id];
+      const w = q.toWorld(SHOWDOWN_SPOT[id][0], SHOWDOWN_SPOT[id][1]);
+      clearStars(b);
+      b.pos.set(w.x, groundAt(w.x, w.z), w.z);
+      b.yaw = sd.out;
+      b.state = 'pose';
+      b.speed = 0; b.windT = 0; b.hitCool = 0; b.chaseT = 0; b.lookYaw = 0;
+      b.jump = DROP_H;
+      b.rig.group.visible = false;
+      if (b.rig.prop) b.rig.prop.visible = true;
+      all.set(b.id, b);
+      sd.landed[id] = false;
+      sd.mid.add(b.pos);
+    }
+    sd.mid.multiplyScalar(1 / BOSS_IDS.length);
+    cut.kind = 'showdown';
+    cut.active = true;
+    cut.t = 0; cut.segT = 0; cut.len = 0; cut.shake = 0;
+    cut.seg = 0;
+    if (cut.clip) cut.clip.stop(0.3);
+    cut.clip = null;
+    cut.fly = 1.7;
+    cut.from.copy(ctx.camera.position);
+    ctx.camera.getWorldDirection(_fwd);
+    cut.fromLook.copy(ctx.camera.position).addScaledVector(_fwd, 12);
+    cut.look.copy(cut.fromLook);
+    ctx.setMode('cutscene');
+    ctx.events.emit('cutscene:start', { bosses: BOSS_IDS.slice(), kind: 'showdown' });
+    const info = ctx.content?.showdown || {};
+    ctx.events.emit('cutscene:focus', { id: 'showdown', index: 0, count: 1, countLabel: info.count || 'Showdown',
+      name: info.name || 'Bikraam & Papaji', eyebrow: info.eyebrow || 'Final showdown', tagline: info.tagline || '' });
+    return true;
+  }
+  function updateShowdown(dt) {
+    cut.t += dt;
+    cut.segT += dt;
+    const T = cut.segT;
+    // the drop-in
+    for (const id of BOSS_IDS) {
+      const b = bosses[id];
+      const tt = T - SHOWDOWN_DROP[id];
+      if (tt < 0) continue;
+      b.rig.group.visible = true;
+      if (!sd.landed[id]) {
+        b.jump = Math.max(0, DROP_H - 0.5 * DROP_G * tt * tt);
+        if (b.jump <= 0) {
+          sd.landed[id] = true;
+          cut.shake = 0.45;
+          if (id === 'bikraam') bossAudio()?.sfx?.('land', { volume: 1.6, rate: 0.55 });
+        }
+      } else {
+        // a little crouch-and-rise from the landing
+        const k = tt - Math.sqrt(2 * DROP_H / DROP_G);
+        b.jump = k < 0.35 ? -Math.sin(k / 0.35 * Math.PI) * 0.18 : 0;
+      }
+    }
+    // the speech starts as the second one lands (its opening boom is the impact)
+    const allDown = BOSS_IDS.every((id) => sd.landed[id]);
+    if (allDown && !cut.clip && !cut.len) {
+      const h = bossAudio()?.playLine?.('bikraam_showdown', { duck: 1 });
+      if (h) { cut.clip = h; cut.len = T + h.duration + 0.5; }
+      else cut.len = T + 6;                    // muted or no clip: hold the shot a moment
+    }
+    // camera: from the gameplay view, swing round to face the pair and slowly arc across them,
+    // drifting in towards Bikraam while he talks
+    const prog = cut.len ? U.clamp((T - 2) / Math.max(1, cut.len - 2), 0, 1) : 0;
+    const bk = bosses.bikraam;
+    const angle = sd.out - 0.55 + prog * 1.1;
+    const R = 7.4 - prog * 2.6;
+    const cx = U.lerp(sd.mid.x, bk.pos.x, prog * 0.45), cz = U.lerp(sd.mid.z, bk.pos.z, prog * 0.45);
+    _camGoal.set(cx - Math.sin(angle) * R, 0, cz - Math.cos(angle) * R);
+    _camGoal.y = Math.max(sd.mid.y + 1.75 + Math.sin(cut.t * 0.6) * 0.12, groundAt(_camGoal.x, _camGoal.z) + 0.8);
+    _lookGoal.set(cx, sd.mid.y + 1.45, cz);
+    const cam = ctx.camera;
+    if (T < cut.fly) {
+      const k = U.smoothstep(0, 1, T / cut.fly);
+      cam.position.lerpVectors(cut.from, _camGoal, k);
+      cam.position.y += Math.sin(k * Math.PI) * 2.5;
+      cut.look.lerpVectors(cut.fromLook, _lookGoal, k);
+    } else {
+      cam.position.copy(_camGoal);
+      cut.look.copy(_lookGoal);
+    }
+    if (cut.shake > 0) {
+      cut.shake = Math.max(0, cut.shake - dt);
+      const a = cut.shake * 0.35;
+      cam.position.x += (Math.random() - 0.5) * a;
+      cam.position.y += (Math.random() - 0.5) * a;
+    }
+    cam.lookAt(cut.look);
+    // both of them eyeball the camera
+    for (const id of BOSS_IDS) {
+      const o = bosses[id];
+      const want = U.angleWrap(yawTo(cam.position.x - o.pos.x, cam.position.z - o.pos.z) - o.yaw);
+      o.lookYaw = U.angleDamp(o.lookYaw, want, 4, dt);
+    }
+    const inp = ctx.input;
+    if (cut.t > 0.6 && inp && (inp.pressed('Space') || inp.pressed('Enter') || inp.pressed('Escape') || inp.pressed('NumpadEnter'))) { skipIntro(); return; }
+    if (cut.len && T >= cut.len) endIntro();
+  }
+  function endShowdown() {
+    for (const id of BOSS_IDS) {
+      const b = bosses[id];
+      b.lookYaw = 0;
+      b.jump = 0;
+      sd.landed[id] = true;
+      b.rig.group.visible = true;
+      startChase(b, true);
+      b.extra = SHOWDOWN_EXTRA;
+      b.hitCool = SHOWDOWN_GRACE;                         // a head start before anyone lands a hit
+    }
+    toast(pickLine(ctx.content?.showdown?.go), 'warn');
+  }
   function skipIntro() {
     if (!cut.active) return;
     if (cut.clip) cut.clip.stop(0.3);
@@ -12433,9 +12595,10 @@ function init(ctx) {
     cut.active = false;
     if (cut.clip && cut.clip.playing) cut.clip.stop(0.8);
     cut.clip = null;
-    for (const id of BOSS_IDS) { const b = bosses[id]; b.lookYaw = 0; toPost(b); }
+    if (cut.kind === 'showdown') endShowdown();
+    else for (const id of BOSS_IDS) { const b = bosses[id]; b.lookYaw = 0; toPost(b); }
     if (ctx.state.mode === 'cutscene') ctx.setMode('playing');
-    ctx.events.emit('cutscene:end', {});
+    ctx.events.emit('cutscene:end', { kind: cut.kind });
   }
   function calmBosses(full) {
     for (const id of BOSS_IDS) {
@@ -12452,6 +12615,7 @@ function init(ctx) {
     bossLine = null;
     clearProjs();
     if (cut.active) { cut.active = false; if (cut.clip) cut.clip.stop(0.3); cut.clip = null; }
+    for (const id of BOSS_IDS) bosses[id].jump = 0;
     for (const id of BOSS_IDS) { const b = bosses[id]; b.lastTake = -1; toPost(b); }
   }
 
@@ -12502,6 +12666,7 @@ function init(ctx) {
     auntyRetryAt = 0;
     mosquitoToastAt = -999;
     vicksToasted = false;
+    showdownDone = false;
     resetBosses();
   }
 
@@ -12530,8 +12695,9 @@ function init(ctx) {
     updateSwarms(dt, t, live);
     updatePits(dt, t, live);
     updateAunty(dt, t, live);
+    if (live) maybeShowdown();
     if (cut.active) {
-      if (ctx.state.mode === 'cutscene') updateCutscene(dt);
+      if (ctx.state.mode === 'cutscene') { if (cut.kind === 'showdown') updateShowdown(dt); else updateCutscene(dt); }
       else if (ctx.state.mode !== 'paused') endIntro();
     }
     updateBosses(dt, t, live);
@@ -12579,6 +12745,8 @@ function init(ctx) {
     beginIntro,
     skipIntro,
     get introActive() { return cut.active; },
+    get showdownActive() { return cut.active && cut.kind === 'showdown'; },
+    beginShowdown: () => { showdownDone = true; return beginShowdown(); },
     // True while Bikraam, Papaji or the rishta aunty is after you (drives the chase music).
     get chasing() {
       if (ctx.state.mode !== 'playing' && ctx.state.mode !== 'paused') return false;
@@ -16773,8 +16941,10 @@ function init(ctx) {
   const cutCount = cutEl.querySelector('.count');
   cutEl.querySelector('.skip').addEventListener('click', () => ctx.hazards?.skipIntro?.());
   let cutCardTimer = 0;
-  ctx.events.on('cutscene:start', () => {
+  const cutSkip = cutEl.querySelector('.skip');
+  ctx.events.on('cutscene:start', (e) => {
     clearToasts();
+    cutSkip.innerHTML = (e && e.kind === 'showdown' ? 'Skip speech' : 'Skip intro') + (isTouch ? '' : '<kbd>Space</kbd>');
     cutEl.hidden = false;
     requestAnimationFrame(() => cutEl.classList.add('on'));
   });
@@ -16782,7 +16952,7 @@ function init(ctx) {
     if (!e) return;
     cutCard.classList.remove('show');
     clearTimeout(cutCardTimer);
-    cutCount.textContent = `Menace ${e.index + 1} of ${e.count}`;
+    cutCount.textContent = e.countLabel || `Menace ${e.index + 1} of ${e.count}`;
     cutCardTimer = setTimeout(() => {
       cutCard.querySelector('.eyebrow').textContent = e.eyebrow || 'Jungle menace';
       cutCard.querySelector('.name').textContent = e.name || '';
